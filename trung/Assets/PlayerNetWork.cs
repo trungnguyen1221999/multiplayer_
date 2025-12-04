@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using Unity.Netcode;
 using Unity.Collections;
+using System.Collections.Generic;
 
 public class PlayerNetWork : NetworkBehaviour
 {
@@ -11,6 +12,8 @@ public class PlayerNetWork : NetworkBehaviour
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Owner
     );
+
+    private List<Transform> spawnedObjects = new List<Transform>();
 
     public struct MyCustomData : INetworkSerializable
     {
@@ -59,12 +62,15 @@ public class PlayerNetWork : NetworkBehaviour
         if(Input.GetKeyDown(KeyCode.Space))
         {
             Vector3 spawnPos = transform.position + transform.forward * 2f;
-            // Clamp spawn position to map bounds
             spawnPos.x = Mathf.Clamp(spawnPos.x, -10f, 10f);
-            spawnPos.y = 0.5f; // Đặt đúng mặt phẳng map
+            spawnPos.y = 0.5f;
             spawnPos.z = Mathf.Clamp(spawnPos.z, -10f, 10f);
-            Transform spawnedObject = Instantiate(spawnObjectPrefab, spawnPos, Quaternion.identity);
-            spawnedObject.GetComponent<NetworkObject>().Spawn();
+            SpawnObjectClientRpc(spawnPos);
+        }
+
+        if(Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl))
+        {
+            DestroyNearestObjectClientRpc();
         }
 
         // WASD
@@ -81,5 +87,29 @@ public class PlayerNetWork : NetworkBehaviour
 
         Vector3 move = new Vector3(moveX, 0f, moveZ).normalized * moveSpeed * Time.deltaTime;
         transform.Translate(move, Space.World);
+    }
+
+    [ClientRpc]
+    private void SpawnObjectClientRpc(Vector3 spawnPos)
+    {
+        Transform spawnedObject = Instantiate(spawnObjectPrefab, spawnPos, Quaternion.identity);
+        var netObj = spawnedObject.GetComponent<NetworkObject>();
+        if (netObj != null && !netObj.IsSpawned)
+            netObj.Spawn();
+        spawnedObjects.Add(spawnedObject);
+    }
+
+    [ClientRpc]
+    private void DestroyNearestObjectClientRpc()
+    {
+        if (spawnedObjects.Count > 0)
+        {
+            Transform obj = spawnedObjects[spawnedObjects.Count - 1];
+            var netObj = obj.GetComponent<NetworkObject>();
+            if (netObj != null && netObj.IsSpawned)
+                netObj.Despawn();
+            Destroy(obj.gameObject);
+            spawnedObjects.RemoveAt(spawnedObjects.Count - 1);
+        }
     }
 }
