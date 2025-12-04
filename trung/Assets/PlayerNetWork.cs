@@ -65,12 +65,12 @@ public class PlayerNetWork : NetworkBehaviour
             spawnPos.x = Mathf.Clamp(spawnPos.x, -10f, 10f);
             spawnPos.y = 0.5f;
             spawnPos.z = Mathf.Clamp(spawnPos.z, -10f, 10f);
-            SpawnObjectClientRpc(spawnPos);
+            RequestSpawnObjectServerRpc(spawnPos);
         }
 
         if(Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl))
         {
-            DestroyNearestObjectClientRpc();
+            RequestDestroyNearestObjectServerRpc();
         }
 
         // WASD
@@ -89,18 +89,18 @@ public class PlayerNetWork : NetworkBehaviour
         transform.Translate(move, Space.World);
     }
 
-    [ClientRpc]
-    private void SpawnObjectClientRpc(Vector3 spawnPos)
+    [ServerRpc]
+    private void RequestSpawnObjectServerRpc(Vector3 spawnPos, ServerRpcParams rpcParams = default)
     {
         Transform spawnedObject = Instantiate(spawnObjectPrefab, spawnPos, Quaternion.identity);
         var netObj = spawnedObject.GetComponent<NetworkObject>();
         if (netObj != null && !netObj.IsSpawned)
-            netObj.Spawn();
+            netObj.SpawnWithOwnership(OwnerClientId);
         spawnedObjects.Add(spawnedObject);
     }
 
-    [ClientRpc]
-    private void DestroyNearestObjectClientRpc()
+    [ServerRpc]
+    private void RequestDestroyNearestObjectServerRpc(ServerRpcParams rpcParams = default)
     {
         if (spawnedObjects.Count > 0)
         {
